@@ -89,9 +89,22 @@ st.markdown("""
 </div>
 """, unsafe_allow_html=True)
 
-# Retrieve secrets
-GOOGLE_SHEET_URL = os.getenv("GOOGLE_SHEET_URL") or st.secrets.get("GOOGLE_SHEET_URL")
-GOOGLE_CREDENTIALS_JSON = os.getenv("GOOGLE_CREDENTIALS_JSON") or st.secrets.get("GOOGLE_CREDENTIALS_JSON")
+# Retrieve secrets - prefer environment variables loaded by dotenv
+GOOGLE_SHEET_URL = os.getenv("GOOGLE_SHEET_URL")
+GOOGLE_CREDENTIALS_JSON = os.getenv("GOOGLE_CREDENTIALS_JSON")
+
+# Fallback to Streamlit secrets if running on Streamlit Cloud
+if not GOOGLE_SHEET_URL:
+    try:
+        GOOGLE_SHEET_URL = st.secrets.get("GOOGLE_SHEET_URL")
+    except Exception:
+        GOOGLE_SHEET_URL = None
+
+if not GOOGLE_CREDENTIALS_JSON:
+    try:
+        GOOGLE_CREDENTIALS_JSON = st.secrets.get("GOOGLE_CREDENTIALS_JSON")
+    except Exception:
+        GOOGLE_CREDENTIALS_JSON = None
 
 @st.cache_data(ttl=3600)  # Cache data for 1 hour to prevent excessive API calls
 def load_data():
