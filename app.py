@@ -311,12 +311,18 @@ else:
     if selected_date is not None:
         date_filtered = filtered_df[filtered_df['Date'].dt.date == selected_date]
 
-    # If no articles found for that exact date, show fallback
+    # If no articles found for that exact date, find nearest available date
     if selected_date is not None and date_filtered.empty:
-        st.warning(f"No news found for **{selected_date.strftime('%d %B %Y')}**. The automation runs daily, so news is only stored for days the script has run. Showing the latest available articles instead.")
-        # Keep filtered_df as is (all dates, category still applied)
-    else:
-        filtered_df = date_filtered
+        all_available_dates = df['Date'].dt.date.unique()
+        if len(all_available_dates) > 0:
+            # Find the closest date to the selected date
+            closest = min(all_available_dates, key=lambda d: abs((d - selected_date).days))
+            date_filtered = filtered_df[filtered_df['Date'].dt.date == closest]
+            diff = abs((closest - selected_date).days)
+            st.info(f"📅 No news stored for **{selected_date.strftime('%d %B %Y')}** — news is only saved on days the automation script runs. Showing the closest available news from **{closest.strftime('%d %B %Y')}** ({diff} day(s) away).")
+            selected_date = closest  # update label
+
+    filtered_df = date_filtered
 
     if search_query:
         filtered_df = filtered_df[
