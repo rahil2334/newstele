@@ -2,10 +2,14 @@ import os
 import json
 import logging
 import requests
+import html
 from datetime import datetime, timezone
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 import feedparser
+from dotenv import load_dotenv
+
+load_dotenv()
 
 # ---------------------------------------------------------
 # Configuration
@@ -17,31 +21,43 @@ GOOGLE_SHEET_URL = os.getenv("GOOGLE_SHEET_URL")
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
 def fetch_top_news():
-    """Fetches the top 5 news articles from BBC News RSS Feed (No API Key Required)."""
-    logging.info("Fetching news from BBC RSS Feed...")
+    """Fetches news articles from multiple RSS Feeds across different genres."""
+    logging.info("Fetching news from multiple RSS Feeds...")
 
-    url = "http://feeds.bbci.co.uk/news/rss.xml"
-    try:
-        feed = feedparser.parse(url)
-        articles = feed.entries[:5] # Get the top 5 articles
-        
-        news_data = []
-        fetch_date = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
-        
-        for article in articles:
-            news_data.append({
-                "Date": fetch_date,
-                "Title": article.get("title", ""),
-                "Source": "BBC News",
-                "Description": article.get("description", ""),
-                "URL": article.get("link", "")
-            })
+    feeds_to_fetch = {
+        "World/Current Affairs": ("BBC News", "http://feeds.bbci.co.uk/news/world/rss.xml"),
+        "Sports": ("BBC Sport", "http://feeds.bbci.co.uk/sport/rss.xml"),
+        "Entertainment/Movies": ("BBC Arts", "http://feeds.bbci.co.uk/news/entertainment_and_arts/rss.xml"),
+        "Technology": ("BBC Tech", "http://feeds.bbci.co.uk/news/technology/rss.xml"),
+        "Business": ("BBC Business", "http://feeds.bbci.co.uk/news/business/rss.xml")
+    }
+    
+    news_data = []
+    fetch_date = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
+    
+    for category, (source_name, url) in feeds_to_fetch.items():
+        try:
+            feed = feedparser.parse(url)
+            # Get the top 2 articles from each category to keep it concise but varied
+            articles = feed.entries[:2] 
             
-        logging.info(f"Successfully fetched {len(news_data)} news articles.")
-        return news_data
-    except Exception as e:
-        logging.error(f"Error fetching news: {e}")
-        return []
+            for article in articles:
+                description = article.get("description", "")
+                if not description:
+                    description = article.get("summary", "No description available.")
+                    
+                news_data.append({
+                    "Date": fetch_date,
+                    "Title": article.get("title", "No Title"),
+                    "Source": f"{source_name} ({category})",
+                    "Description": description,
+                    "URL": article.get("link", "")
+                })
+        except Exception as e:
+            logging.error(f"Error fetching {category} news: {e}")
+            
+    logging.info(f"Successfully fetched {len(news_data)} news articles.")
+    return news_data
 
 def get_google_sheet():
     """Authenticates and returns the Google Sheet."""
@@ -118,9 +134,13 @@ def send_to_telegram(news_list):
     message = f"📰 <b>Top News – {today_str}</b>\n\n"
     
     for i, news in enumerate(news_list, 1):
-        message += f"<b>{i}. {news['Title']}</b>\n"
-        message += f"Source: {news['Source']}\n"
-        message += f"Read more: <a href='{news['URL']}'>{news['URL']}</a>\n\n"
+        safe_title = html.escape(news['Title'])
+        safe_source = html.escape(news['Source'])
+        safe_url = html.escape(news['URL'])
+        
+        message += f"<b>{i}. {safe_title}</b>\n"
+        message += f"Source: {safe_source}\n"
+        message += f"Read more: <a href='{safe_url}'>Link</a>\n\n"
 
     url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
     payload = {
@@ -135,7 +155,8 @@ def send_to_telegram(news_list):
         response.raise_for_status()
         logging.info("Successfully sent message to Telegram.")
     except Exception as e:
-        logging.error(f"Error sending message to Telegram: {e}")
+        error_msg = response.text if 'response' in locals() and hasattr(response, 'text') else str(e)
+        logging.error(f"Error sending message to Telegram: {error_msg}")
 
 def main():
     logging.info("Starting Daily News Automation...")

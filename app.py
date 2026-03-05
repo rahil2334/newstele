@@ -4,14 +4,90 @@ import streamlit as st
 import pandas as pd
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
+from dotenv import load_dotenv
+
+load_dotenv()
 
 # ---------------------------------------------------------
 # Streamlit Configuration & Initialization
 # ---------------------------------------------------------
-st.set_page_config(page_title="Top News Dashboard", page_icon="📰", layout="wide")
+st.set_page_config(page_title="Top News Feacher", page_icon="📰", layout="wide")
 
-st.title("📰 Daily Top News Dashboard")
-st.markdown("Displays the latest top news automatically fetched every day and stored in Google Sheets.")
+# Injecting Custom BBC Style CSS with user requested font
+st.markdown("""
+<style>
+/* Reset padding to make header align perfectly */
+.block-container {
+    padding-top: 0rem !important;
+    padding-left: 0rem !important;
+    padding-right: 0rem !important;
+    max-width: 1200px;
+}
+
+/* Custom Header styling */
+.main-header {
+    background-color: #B80000;
+    color: white;
+    padding: 15px 30px;
+    font-family: "Times New Roman", Times, serif;
+    font-size: 42px;
+    font-weight: bold;
+    margin-bottom: 30px;
+    width: 100%;
+    display: flex;
+    align-items: center;
+}
+
+/* App Background */
+.stApp {
+    background-color: #F6F6F6;
+}
+
+/* News Article Card */
+.bbc-news-container {
+    background-color: #FFFFFF;
+    padding: 20px 30px;
+    margin-bottom: 15px;
+    border-left: 4px solid #B80000;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+.bbc-news-title {
+    color: #222222;
+    font-size: 26px;
+    font-weight: bold;
+    text-decoration: none;
+    font-family: "Times New Roman", Times, serif;
+    margin-bottom: 8px;
+    display: block;
+    line-height: 1.2;
+}
+
+.bbc-news-title:hover {
+    color: #B80000;
+    text-decoration: underline;
+}
+
+.bbc-news-meta {
+    color: #5A5A5A;
+    font-size: 14px;
+    font-family: Arial, sans-serif;
+    margin-bottom: 12px;
+    text-transform: uppercase;
+}
+
+.bbc-news-desc {
+    color: #404040;
+    font-size: 16px;
+    font-family: Arial, sans-serif;
+    line-height: 1.5;
+}
+</style>
+
+<div class="main-header">
+    Top News Feacher
+</div>
+""", unsafe_allow_html=True)
 
 # Retrieve secrets
 GOOGLE_SHEET_URL = os.getenv("GOOGLE_SHEET_URL") or st.secrets.get("GOOGLE_SHEET_URL")
@@ -90,11 +166,13 @@ else:
     st.subheader(f"Showing {len(filtered_df)} News Articles")
 
     # ---------------------------------------------------------
-    # Display News Cards
+    # Display News Cards in BBC Format
     # ---------------------------------------------------------
     for index, row in filtered_df.iterrows():
-        with st.container():
-            st.markdown(f"### [{row['Title']}]({row['URL']})")
-            st.caption(f"**Source:** {row['Source']} | **Date:** {row['Date'].strftime('%Y-%m-%d %H:%M:%S UTC')}")
-            st.write(row['Description'])
-            st.markdown("---")
+        st.markdown(f"""
+        <div class="bbc-news-container">
+            <a href="{row['URL']}" target="_blank" class="bbc-news-title">{row['Title']}</a>
+            <div class="bbc-news-meta"><strong>{row['Source']}</strong> &nbsp;|&nbsp; {row['Date'].strftime('%d %b %Y')}</div>
+            <div class="bbc-news-desc">{row['Description']}</div>
+        </div>
+        """, unsafe_allow_html=True)
