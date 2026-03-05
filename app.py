@@ -1,5 +1,6 @@
 import os
 import json
+from datetime import date
 import streamlit as st
 import pandas as pd
 import gspread
@@ -289,10 +290,10 @@ else:
         available_dates = sorted(df['Date'].dt.date.unique(), reverse=True)
         selected_date = st.date_input(
             "📅 Select a date to view news",
-            value=available_dates[0] if available_dates else None,
-            min_value=available_dates[-1] if available_dates else None,
-            max_value=available_dates[0] if available_dates else None,
-            help="Pick a date to filter news articles from that day"
+            value=available_dates[0] if available_dates else date.today(),
+            min_value=date(2020, 1, 1),
+            max_value=date.today(),
+            help="Navigate the calendar and click any past date to see news from that day"
         )
     with col_clear:
         st.write("")
