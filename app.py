@@ -272,10 +272,6 @@ df = load_data()
 # ---------------------------------------------------------
 st.sidebar.markdown("## 🔍 Filter News")
 search_query = st.sidebar.text_input("🔎 Search Title or Description")
-selected_date = "All Dates"
-if not df.empty:
-    unique_dates = df['Date'].dt.date.unique()
-    selected_date = st.sidebar.selectbox("📅 Select Date", ["All Dates"] + list(unique_dates))
 
 # ---------------------------------------------------------
 # Main Content
@@ -287,13 +283,30 @@ if not GOOGLE_SHEET_URL or not GOOGLE_CREDENTIALS_JSON:
 elif df.empty:
     st.info("No news data available yet. Please run `fetch_news.py` to populate the Google Sheet.")
 else:
+    # Calendar date picker
+    col_cal, col_clear = st.columns([3, 1])
+    with col_cal:
+        available_dates = sorted(df['Date'].dt.date.unique(), reverse=True)
+        selected_date = st.date_input(
+            "📅 Select a date to view news",
+            value=available_dates[0] if available_dates else None,
+            min_value=available_dates[-1] if available_dates else None,
+            max_value=available_dates[0] if available_dates else None,
+            help="Pick a date to filter news articles from that day"
+        )
+    with col_clear:
+        st.write("")
+        if st.button("🔄 Show All Dates"):
+            selected_date = None
+
     filtered_df = df.copy()
 
-    # Apply category filter from URL params
+    # Apply category filter
     if active_cat != "All":
         filtered_df = filtered_df[filtered_df['Source'].str.contains(active_cat, case=False, na=False)]
 
-    if selected_date != "All Dates":
+    # Apply date filter from calendar
+    if selected_date is not None:
         filtered_df = filtered_df[filtered_df['Date'].dt.date == selected_date]
 
     if search_query:
