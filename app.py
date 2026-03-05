@@ -307,8 +307,16 @@ else:
         filtered_df = filtered_df[filtered_df['Source'].str.contains(active_cat, case=False, na=False)]
 
     # Apply date filter from calendar
+    date_filtered = filtered_df.copy()
     if selected_date is not None:
-        filtered_df = filtered_df[filtered_df['Date'].dt.date == selected_date]
+        date_filtered = filtered_df[filtered_df['Date'].dt.date == selected_date]
+
+    # If no articles found for that exact date, show fallback
+    if selected_date is not None and date_filtered.empty:
+        st.warning(f"No news found for **{selected_date.strftime('%d %B %Y')}**. The automation runs daily, so news is only stored for days the script has run. Showing the latest available articles instead.")
+        # Keep filtered_df as is (all dates, category still applied)
+    else:
+        filtered_df = date_filtered
 
     if search_query:
         filtered_df = filtered_df[
@@ -316,10 +324,11 @@ else:
             filtered_df['Description'].str.contains(search_query, case=False, na=False)
         ]
 
+    date_label = selected_date.strftime('%d %B %Y') if selected_date else "All Dates"
     display_cat = active_cat if active_cat != "All" else "All Categories"
     st.markdown(
         f"<p style='font-family:Inter,sans-serif;color:#888;font-size:13px;padding:0 0 14px 0;'>"
-        f"Showing <strong>{len(filtered_df)}</strong> articles in <strong>{display_cat}</strong></p>",
+        f"Showing <strong>{len(filtered_df)}</strong> articles &bull; <strong>{display_cat}</strong> &bull; {date_label}</p>",
         unsafe_allow_html=True
     )
 
