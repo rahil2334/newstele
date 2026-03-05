@@ -1,6 +1,6 @@
 import os
 import json
-from datetime import date
+from datetime import date, timedelta
 import streamlit as st
 import pandas as pd
 import gspread
@@ -15,13 +15,15 @@ load_dotenv()
 st.set_page_config(page_title="Top News Fetcher", page_icon="📰", layout="wide")
 
 # ---------------------------------------------------------
-# Read active category from URL query params
+# Read active category from URL query params (safe)
 # ---------------------------------------------------------
-params = st.query_params
-active_cat = params.get("category", "All")
+try:
+    active_cat = st.query_params.get("category", "All")
+except Exception:
+    active_cat = "All"
 
 # ---------------------------------------------------------
-# CSS + Sticky Header HTML
+# Build nav items HTML
 # ---------------------------------------------------------
 categories = {
     "All":           "All",
@@ -37,36 +39,32 @@ for label, value in categories.items():
     is_active = "active" if active_cat == value or (active_cat == "All" and label == "All") else ""
     nav_items_html += f'<a class="nav-item {is_active}" href="?category={value}">{label}</a>'
 
+# ---------------------------------------------------------
+# CSS + Sticky Header
+# ---------------------------------------------------------
 st.markdown(f"""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700&family=Inter:wght@400;600&display=swap');
 
-* {{ box-sizing: border-box; margin: 0; padding: 0; }}
+*, *::before, *::after {{ box-sizing: border-box; margin: 0; padding: 0; }}
 
-/* Push content below the fixed header (header ~130px + nav ~44px) */
 .block-container {{
-    padding-top: 182px !important;
+    padding-top: 186px !important;
     padding-left: 0 !important;
     padding-right: 0 !important;
     max-width: 100% !important;
 }}
 
-.stApp {{
-    background-color: #F0F0F0;
-    font-family: 'Inter', sans-serif;
-}}
+.stApp {{ background-color: #F0F0F0; font-family: 'Inter', sans-serif; }}
 
-/* === STICKY WRAPPER === */
 .sticky-header {{
     position: fixed;
-    top: 0;
-    left: 0;
+    top: 0; left: 0;
     width: 100%;
     z-index: 99999;
     box-shadow: 0 2px 8px rgba(0,0,0,0.25);
 }}
 
-/* === RED TITLE BAR === */
 .site-header {{
     background-color: #BB1919;
     color: #FFFFFF;
@@ -99,7 +97,6 @@ st.markdown(f"""
     margin-top: 4px;
 }}
 
-/* === DARK NAV BAR === */
 .nav-bar {{
     background-color: #1A1A1A;
     display: flex;
@@ -122,30 +119,40 @@ st.markdown(f"""
     height: 100%;
     display: flex;
     align-items: center;
-    transition: background 0.2s, color 0.2s;
     border-bottom: 3px solid transparent;
+    transition: background 0.15s, color 0.15s;
 }}
 
-.nav-item:hover {{
-    background-color: #2A2A2A;
-    color: #FFFFFF;
-    border-bottom: 3px solid #BB1919;
-}}
+.nav-item:hover {{ background-color: #2A2A2A; color: #FFFFFF; border-bottom: 3px solid #BB1919; }}
+.nav-item.active {{ color: #FFFFFF; background-color: #BB1919; border-bottom: 3px solid #FF4444; }}
 
-.nav-item.active {{
-    color: #FFFFFF;
-    background-color: #BB1919;
-    border-bottom: 3px solid #FF4444;
-}}
-
-/* === CONTENT === */
 .content-wrapper {{
     max-width: 960px;
     margin: 24px auto 0 auto;
     padding: 0 24px 64px 24px;
 }}
 
-/* === NEWS CARDS === */
+/* Time range pills */
+div[data-testid="stHorizontalBlock"] .stButton > button {{
+    border-radius: 20px;
+    border: 2px solid #CCC;
+    background: #FFF;
+    color: #444;
+    font-size: 13px;
+    font-weight: 600;
+    font-family: 'Inter', sans-serif;
+    padding: 6px 18px;
+    transition: all 0.15s;
+    width: 100%;
+}}
+
+div[data-testid="stHorizontalBlock"] .stButton > button:hover {{
+    border-color: #BB1919;
+    color: #BB1919;
+    background: #FFF5F5;
+}}
+
+/* News Cards */
 .news-card {{
     background-color: #FFFFFF;
     border-top: 3px solid #BB1919;
@@ -196,7 +203,6 @@ st.markdown(f"""
     line-height: 1.65;
 }}
 
-/* === FOOTER === */
 .site-footer {{
     background-color: #1A1A1A;
     color: #AAAAAA;
@@ -207,11 +213,7 @@ st.markdown(f"""
     letter-spacing: 1px;
 }}
 
-/* Hide Streamlit top header bar chrome */
-header[data-testid="stHeader"] {{
-    background: transparent;
-    height: 0;
-}}
+header[data-testid="stHeader"] {{ background: transparent; height: 0; }}
 </style>
 
 <div class="sticky-header">
@@ -269,7 +271,7 @@ def load_data():
 df = load_data()
 
 # ---------------------------------------------------------
-# Sidebar Filters
+# Sidebar Search
 # ---------------------------------------------------------
 st.sidebar.markdown("## 🔍 Filter News")
 search_query = st.sidebar.text_input("🔎 Search Title or Description")
@@ -284,57 +286,58 @@ if not GOOGLE_SHEET_URL or not GOOGLE_CREDENTIALS_JSON:
 elif df.empty:
     st.info("No news data available yet. Please run `fetch_news.py` to populate the Google Sheet.")
 else:
-    # Calendar date picker
-    col_cal, col_clear = st.columns([3, 1])
-    with col_cal:
-        available_dates = sorted(df['Date'].dt.date.unique(), reverse=True)
-        selected_date = st.date_input(
-            "📅 Select a date to view news",
-            value=available_dates[0] if available_dates else date.today(),
-            min_value=date(2020, 1, 1),
-            max_value=date.today(),
-            help="Navigate the calendar and click any past date to see news from that day"
-        )
-    with col_clear:
-        st.write("")
-        if st.button("🔄 Show All Dates"):
-            selected_date = None
+    # ----- TIME RANGE SELECTOR (replaces calendar) -----
+    today = date.today()
+    st.markdown("**🗓️ Filter by Time Period**")
+    t1, t2, t3, t4, t5 = st.columns(5)
+    if "time_range" not in st.session_state:
+        st.session_state.time_range = "All Time"
 
+    if t1.button("📅 Today"):
+        st.session_state.time_range = "Today"
+    if t2.button("📅 Yesterday"):
+        st.session_state.time_range = "Yesterday"
+    if t3.button("📅 Last 7 Days"):
+        st.session_state.time_range = "Last 7 Days"
+    if t4.button("📅 Last 30 Days"):
+        st.session_state.time_range = "Last 30 Days"
+    if t5.button("🔄 All Time"):
+        st.session_state.time_range = "All Time"
+
+    # Apply time range filter
     filtered_df = df.copy()
+    tr = st.session_state.time_range
+    if tr == "Today":
+        filtered_df = filtered_df[filtered_df['Date'].dt.date == today]
+    elif tr == "Yesterday":
+        filtered_df = filtered_df[filtered_df['Date'].dt.date == (today - timedelta(days=1))]
+    elif tr == "Last 7 Days":
+        filtered_df = filtered_df[filtered_df['Date'].dt.date >= (today - timedelta(days=7))]
+    elif tr == "Last 30 Days":
+        filtered_df = filtered_df[filtered_df['Date'].dt.date >= (today - timedelta(days=30))]
 
     # Apply category filter
     if active_cat != "All":
         filtered_df = filtered_df[filtered_df['Source'].str.contains(active_cat, case=False, na=False)]
 
-    # Apply date filter from calendar
-    date_filtered = filtered_df.copy()
-    if selected_date is not None:
-        date_filtered = filtered_df[filtered_df['Date'].dt.date == selected_date]
-
-    # If no articles found for that exact date, find nearest available date
-    if selected_date is not None and date_filtered.empty:
-        all_available_dates = df['Date'].dt.date.unique()
-        if len(all_available_dates) > 0:
-            # Find the closest date to the selected date
-            closest = min(all_available_dates, key=lambda d: abs((d - selected_date).days))
-            date_filtered = filtered_df[filtered_df['Date'].dt.date == closest]
-            diff = abs((closest - selected_date).days)
-            st.info(f"📅 No news stored for **{selected_date.strftime('%d %B %Y')}** — news is only saved on days the automation script runs. Showing the closest available news from **{closest.strftime('%d %B %Y')}** ({diff} day(s) away).")
-            selected_date = closest  # update label
-
-    filtered_df = date_filtered
-
+    # Apply search filter
     if search_query:
         filtered_df = filtered_df[
             filtered_df['Title'].str.contains(search_query, case=False, na=False) |
             filtered_df['Description'].str.contains(search_query, case=False, na=False)
         ]
 
-    date_label = selected_date.strftime('%d %B %Y') if selected_date else "All Dates"
+    # If no results for selected time range, show nearest
+    if filtered_df.empty and tr != "All Time":
+        st.info(f"No news found for **{tr}**. Showing all available articles instead.")
+        filtered_df = df.copy()
+        if active_cat != "All":
+            filtered_df = filtered_df[filtered_df['Source'].str.contains(active_cat, case=False, na=False)]
+
     display_cat = active_cat if active_cat != "All" else "All Categories"
     st.markdown(
-        f"<p style='font-family:Inter,sans-serif;color:#888;font-size:13px;padding:0 0 14px 0;'>"
-        f"Showing <strong>{len(filtered_df)}</strong> articles &bull; <strong>{display_cat}</strong> &bull; {date_label}</p>",
+        f"<p style='font-family:Inter,sans-serif;color:#888;font-size:13px;padding:8px 0 14px 0;'>"
+        f"Showing <strong>{len(filtered_df)}</strong> articles &bull; <strong>{display_cat}</strong> &bull; {tr}</p>",
         unsafe_allow_html=True
     )
 
