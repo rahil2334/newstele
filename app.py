@@ -208,10 +208,8 @@ st.markdown(f"""
 }}
 
 /* Hide Streamlit top header bar chrome */
-header[data-testid="stHeader"] {{
-    background: transparent;
-    height: 0;
-}}
+header[data-testid="stHeader"] {{ background: transparent; height: 0; }}
+section[data-testid="stSidebar"] {{ display: none !important; }}
 </style>
 
 <div class="sticky-header">
@@ -268,11 +266,8 @@ def load_data():
 
 df = load_data()
 
-# ---------------------------------------------------------
-# Sidebar Filters
-# ---------------------------------------------------------
-st.sidebar.markdown("## ­ƒöì Filter News")
-search_query = st.sidebar.text_input("­ƒöÄ Search Title or Description")
+# No sidebar - search removed per user request
+search_query = ""
 
 # ---------------------------------------------------------
 # Main Content
