@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Top News Fetcher - Vercel Edition</title>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Playfair+Display:wght@700;800&display=swap" rel="stylesheet">
+    <!-- Local CSS -->
+    <link rel="stylesheet" href="style.css">
+    <!-- Phosphor Icons for subtle UI -->
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+</head>
+<body class="dark-theme">
+
+    <header class="glass-header">
+        <div class="header-content">
+            <h1 class="logo">Top News Fetcher</h1>
+            <p class="tagline">DAILY NEWS &bull; AUTOMATICALLY CURATED</p>
+        </div>
+        <nav class="nav-bar">
+            <button class="nav-item active" data-category="All">All News</button>
+            <button class="nav-item" data-category="World/Current Affairs">World</button>
+            <button class="nav-item" data-category="Business">Business</button>
+            <button class="nav-item" data-category="Technology">Technology</button>
+            <button class="nav-item" data-category="Entertainment/Movies">Entertainment</button>
+            <button class="nav-item" data-category="Sports">Sports</button>
+        </nav>
+    </header>
+
+    <main class="container">
+        <!-- Toolbar: Filters and Search -->
+        <section class="toolbar">
+            <div class="date-filter">
+                <label for="date-picker"><i class="ph ph-calendar-blank"></i> Filter by Date</label>
+                <div class="picker-group">
+                    <input type="date" id="date-picker" />
+                    <button id="clear-date" class="secondary-btn" title="Clear Date">
+                        <i class="ph ph-x"></i> Clear
+                    </button>
+                </div>
+            </div>
+            
+            <div class="status-text" id="status-bar">
+                Loading news...
+            </div>
+        </section>
+
+        <!-- Loader -->
+        <div id="loader" class="loader-container">
+            <div class="spinner"></div>
+            <p>Fetching the latest stories...</p>
+        </div>
+
+        <!-- Error State -->
+        <div id="error-message" class="error-container" style="display: none;">
+            <i class="ph ph-warning-circle"></i>
+            <h3>Oops! Something went wrong</h3>
+            <p id="error-text">Failed to fetch news.</p>
+        </div>
+
+        <!-- News Grid -->
+        <section id="news-grid" class="news-grid" style="display: none;">
+            <!-- dynamic content here -->
+        </section>
+    </main>
+
+    <footer>
+        <p>&copy; <span id="year">2026</span> Top News Fetcher &mdash; Automated BBC News Aggregator &bull; Powered by Vercel & FastAPI</p>
+    </footer>
+
+    <script src="script.js"></script>
+</body>
+</html>
