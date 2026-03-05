@@ -351,6 +351,6 @@ else:
 st.markdown("</div>", unsafe_allow_html=True)
 st.markdown("""
 <div class="site-footer">
-    &copy; 2025 Top News Fetcher &mdash; Automated BBC News Aggregator &bull; Powered by Streamlit
+    &copy; 2026 Top News Fetcher &mdash; Automated BBC News Aggregator &bull; Powered by Streamlit
 </div>
 """, unsafe_allow_html=True)
