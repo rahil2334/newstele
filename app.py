@@ -9,84 +9,151 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # ---------------------------------------------------------
-# Streamlit Configuration & Initialization
+# Streamlit Configuration
 # ---------------------------------------------------------
 st.set_page_config(page_title="Top News Fetcher", page_icon="📰", layout="wide")
 
 # ---------------------------------------------------------
-# CSS Styling
+# Read active category from URL query params
 # ---------------------------------------------------------
-st.markdown("""
+params = st.query_params
+active_cat = params.get("category", "All")
+
+# ---------------------------------------------------------
+# CSS + Sticky Header HTML
+# ---------------------------------------------------------
+categories = {
+    "All":           "All",
+    "World":         "World/Current Affairs",
+    "Sports":        "Sports",
+    "Entertainment": "Entertainment/Movies",
+    "Technology":    "Technology",
+    "Business":      "Business",
+}
+
+nav_items_html = ""
+for label, value in categories.items():
+    is_active = "active" if active_cat == value or (active_cat == "All" and label == "All") else ""
+    nav_items_html += f'<a class="nav-item {is_active}" href="?category={value}">{label}</a>'
+
+st.markdown(f"""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700&family=Inter:wght@400;600&display=swap');
 
-*, *::before, *::after { box-sizing: border-box; }
+* {{ box-sizing: border-box; margin: 0; padding: 0; }}
 
-.block-container {
-    padding: 0 !important;
+/* Push content below the fixed header (header ~130px + nav ~44px) */
+.block-container {{
+    padding-top: 182px !important;
+    padding-left: 0 !important;
+    padding-right: 0 !important;
     max-width: 100% !important;
-}
+}}
 
-.stApp {
-    background-color: #F2F2F2;
+.stApp {{
+    background-color: #F0F0F0;
     font-family: 'Inter', sans-serif;
-}
+}}
 
-/* === HEADER === */
-.site-header {
+/* === STICKY WRAPPER === */
+.sticky-header {{
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    z-index: 99999;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.25);
+}}
+
+/* === RED TITLE BAR === */
+.site-header {{
     background-color: #BB1919;
     color: #FFFFFF;
-    padding: 40px 48px 34px 48px;
+    padding: 20px 48px 16px 48px;
     text-align: center;
     border-bottom: 4px solid #880000;
-    margin-bottom: 0;
-    min-height: 140px;
+    min-height: 90px;
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    overflow: visible !important;
-}
+    overflow: visible;
+}}
 
-.site-header .logo {
+.site-header .logo {{
     font-family: "Times New Roman", Times, serif;
-    font-size: 52px;
+    font-size: 48px;
     font-weight: bold;
     letter-spacing: 2px;
     line-height: 1.2;
-    display: block;
-    margin: 0 auto 6px auto;
-    overflow: visible !important;
     white-space: nowrap;
-}
+    overflow: visible;
+}}
 
-.site-header .tagline {
-    font-family: 'Inter', sans-serif;
-    font-size: 12px;
+.site-header .tagline {{
+    font-size: 11px;
     color: rgba(255,255,255,0.85);
     letter-spacing: 3px;
     text-transform: uppercase;
     margin-top: 4px;
-    display: block;
-}
+}}
 
-/* === CONTENT AREA === */
-.content-wrapper {
+/* === DARK NAV BAR === */
+.nav-bar {{
+    background-color: #1A1A1A;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0;
+    height: 44px;
+    border-bottom: 2px solid #333;
+}}
+
+.nav-item {{
+    color: #CCCCCC;
+    font-family: 'Inter', sans-serif;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    text-decoration: none;
+    padding: 12px 22px;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    transition: background 0.2s, color 0.2s;
+    border-bottom: 3px solid transparent;
+}}
+
+.nav-item:hover {{
+    background-color: #2A2A2A;
+    color: #FFFFFF;
+    border-bottom: 3px solid #BB1919;
+}}
+
+.nav-item.active {{
+    color: #FFFFFF;
+    background-color: #BB1919;
+    border-bottom: 3px solid #FF4444;
+}}
+
+/* === CONTENT === */
+.content-wrapper {{
     max-width: 960px;
-    margin: 28px auto 0 auto;
-    padding: 0 24px 48px 24px;
-}
+    margin: 24px auto 0 auto;
+    padding: 0 24px 64px 24px;
+}}
 
 /* === NEWS CARDS === */
-.news-card {
+.news-card {{
     background-color: #FFFFFF;
     border-top: 3px solid #BB1919;
     padding: 24px 28px;
     margin-bottom: 18px;
     box-shadow: 0 1px 4px rgba(0,0,0,0.08);
-}
+}}
 
-.news-card-category {
+.news-card-category {{
     font-family: 'Inter', sans-serif;
     font-size: 11px;
     font-weight: 700;
@@ -94,9 +161,9 @@ st.markdown("""
     text-transform: uppercase;
     color: #BB1919;
     margin-bottom: 8px;
-}
+}}
 
-.news-card-title a {
+.news-card-title a {{
     font-family: "Times New Roman", Times, serif;
     font-size: 24px;
     font-weight: bold;
@@ -105,11 +172,11 @@ st.markdown("""
     line-height: 1.3;
     display: block;
     margin-bottom: 10px;
-}
+}}
 
-.news-card-title a:hover { color: #BB1919; }
+.news-card-title a:hover {{ color: #BB1919; }}
 
-.news-card-meta {
+.news-card-meta {{
     font-family: 'Inter', sans-serif;
     font-size: 12px;
     color: #888888;
@@ -119,53 +186,41 @@ st.markdown("""
     margin-bottom: 12px;
     border-bottom: 1px solid #EEEEEE;
     padding-bottom: 12px;
-}
+}}
 
-.news-card-desc {
+.news-card-desc {{
     font-family: 'Inter', sans-serif;
     font-size: 15px;
     color: #4A4A4A;
     line-height: 1.65;
-}
-
-/* === CATEGORY BUTTONS === */
-div[data-testid="stHorizontalBlock"] > div > div.stButton > button {
-    background-color: #222222;
-    color: #DDDDDD;
-    border: none;
-    border-radius: 0px;
-    font-family: 'Inter', sans-serif;
-    font-size: 12px;
-    font-weight: 700;
-    letter-spacing: 1.5px;
-    text-transform: uppercase;
-    padding: 8px 18px;
-    width: 100%;
-    cursor: pointer;
-}
-
-div[data-testid="stHorizontalBlock"] > div > div.stButton > button:hover,
-div[data-testid="stHorizontalBlock"] > div > div.stButton > button:focus {
-    background-color: #BB1919;
-    color: #FFFFFF;
-    border-color: #BB1919;
-}
+}}
 
 /* === FOOTER === */
-.site-footer {
-    background-color: #222222;
+.site-footer {{
+    background-color: #1A1A1A;
     color: #AAAAAA;
     text-align: center;
-    padding: 18px;
-    font-size: 13px;
-    font-family: 'Inter', sans-serif;
+    padding: 20px;
+    font-size: 12px;
     margin-top: 48px;
-}
+    letter-spacing: 1px;
+}}
+
+/* Hide Streamlit top header bar chrome */
+header[data-testid="stHeader"] {{
+    background: transparent;
+    height: 0;
+}}
 </style>
 
-<div class="site-header">
-    <span class="logo">Top News Fetcher</span>
-    <div class="tagline">Daily News &bull; Automatically Curated</div>
+<div class="sticky-header">
+    <div class="site-header">
+        <span class="logo">Top News Fetcher</span>
+        <span class="tagline">Daily News &bull; Automatically Curated</span>
+    </div>
+    <div class="nav-bar">
+        {nav_items_html}
+    </div>
 </div>
 """, unsafe_allow_html=True)
 
@@ -188,7 +243,7 @@ if not GOOGLE_CREDENTIALS_JSON:
         GOOGLE_CREDENTIALS_JSON = None
 
 # ---------------------------------------------------------
-# Load Data from Google Sheets
+# Load Data
 # ---------------------------------------------------------
 @st.cache_data(ttl=3600)
 def load_data():
@@ -196,10 +251,7 @@ def load_data():
         return pd.DataFrame()
     try:
         scope = ['https://spreadsheets.google.com/feeds', 'https://www.googleapis.com/auth/drive']
-        if isinstance(GOOGLE_CREDENTIALS_JSON, str):
-            creds_dict = json.loads(GOOGLE_CREDENTIALS_JSON)
-        else:
-            creds_dict = dict(GOOGLE_CREDENTIALS_JSON)
+        creds_dict = json.loads(GOOGLE_CREDENTIALS_JSON) if isinstance(GOOGLE_CREDENTIALS_JSON, str) else dict(GOOGLE_CREDENTIALS_JSON)
         creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
         client = gspread.authorize(creds)
         sheet = client.open_by_url(GOOGLE_SHEET_URL).sheet1
@@ -208,8 +260,7 @@ def load_data():
             return pd.DataFrame()
         df = pd.DataFrame(records)
         df['Date'] = pd.to_datetime(df['Date'])
-        df = df.sort_values(by="Date", ascending=False)
-        return df
+        return df.sort_values(by="Date", ascending=False)
     except Exception as e:
         st.error(f"Error accessing Google Sheets: {e}")
         return pd.DataFrame()
@@ -217,34 +268,14 @@ def load_data():
 df = load_data()
 
 # ---------------------------------------------------------
-# Session State for Category Selection
-# ---------------------------------------------------------
-if "active_category" not in st.session_state:
-    st.session_state.active_category = "All"
-
-# ---------------------------------------------------------
-# Functional Category Nav Bar
-# ---------------------------------------------------------
-categories = ["All", "World/Current Affairs", "Sports", "Entertainment/Movies", "Technology", "Business"]
-cat_labels  = ["All",  "World",              "Sports",  "Entertainment",         "Technology",  "Business"]
-
-# Render as columns of buttons
-cols = st.columns(len(categories))
-for i, (cat, label) in enumerate(zip(categories, cat_labels)):
-    if cols[i].button(label, key=f"cat_{cat}"):
-        st.session_state.active_category = cat
-
-# ---------------------------------------------------------
 # Sidebar Filters
 # ---------------------------------------------------------
 st.sidebar.markdown("## 🔍 Filter News")
 search_query = st.sidebar.text_input("🔎 Search Title or Description")
-
+selected_date = "All Dates"
 if not df.empty:
     unique_dates = df['Date'].dt.date.unique()
     selected_date = st.sidebar.selectbox("📅 Select Date", ["All Dates"] + list(unique_dates))
-else:
-    selected_date = "All Dates"
 
 # ---------------------------------------------------------
 # Main Content
@@ -258,23 +289,25 @@ elif df.empty:
 else:
     filtered_df = df.copy()
 
-    # Apply category filter
-    if st.session_state.active_category != "All":
-        filtered_df = filtered_df[filtered_df['Source'].str.contains(st.session_state.active_category, case=False, na=False)]
+    # Apply category filter from URL params
+    if active_cat != "All":
+        filtered_df = filtered_df[filtered_df['Source'].str.contains(active_cat, case=False, na=False)]
 
-    # Apply date filter
     if selected_date != "All Dates":
         filtered_df = filtered_df[filtered_df['Date'].dt.date == selected_date]
 
-    # Apply search filter
     if search_query:
         filtered_df = filtered_df[
             filtered_df['Title'].str.contains(search_query, case=False, na=False) |
             filtered_df['Description'].str.contains(search_query, case=False, na=False)
         ]
 
-    active = st.session_state.active_category if st.session_state.active_category != "All" else "All Categories"
-    st.markdown(f"<p style='font-family:Inter,sans-serif; color:#888; font-size:13px; padding: 12px 0;'>Showing <strong>{len(filtered_df)}</strong> articles in <strong>{active}</strong></p>", unsafe_allow_html=True)
+    display_cat = active_cat if active_cat != "All" else "All Categories"
+    st.markdown(
+        f"<p style='font-family:Inter,sans-serif;color:#888;font-size:13px;padding:0 0 14px 0;'>"
+        f"Showing <strong>{len(filtered_df)}</strong> articles in <strong>{display_cat}</strong></p>",
+        unsafe_allow_html=True
+    )
 
     for _, row in filtered_df.iterrows():
         source_label = row['Source']
