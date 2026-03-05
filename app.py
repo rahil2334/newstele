@@ -36,29 +36,38 @@ st.markdown("""
 .site-header {
     background-color: #BB1919;
     color: #FFFFFF;
-    padding: 28px 48px 20px 48px;
+    padding: 40px 48px 34px 48px;
     text-align: center;
     border-bottom: 4px solid #880000;
     margin-bottom: 0;
+    min-height: 140px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    overflow: visible !important;
 }
 
 .site-header .logo {
     font-family: "Times New Roman", Times, serif;
-    font-size: 48px;
+    font-size: 52px;
     font-weight: bold;
     letter-spacing: 2px;
-    line-height: 1.1;
+    line-height: 1.2;
     display: block;
-    margin: 0 auto;
+    margin: 0 auto 6px auto;
+    overflow: visible !important;
+    white-space: nowrap;
 }
 
 .site-header .tagline {
     font-family: 'Inter', sans-serif;
     font-size: 12px;
-    color: rgba(255,255,255,0.75);
+    color: rgba(255,255,255,0.85);
     letter-spacing: 3px;
     text-transform: uppercase;
-    margin-top: 6px;
+    margin-top: 4px;
+    display: block;
 }
 
 /* === CONTENT AREA === */
