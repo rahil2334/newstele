@@ -10,7 +10,7 @@ An automated data pipeline and UI dashboard that fetches the top 5 news articles
 
 ---
 
-## Step 1: No API Key Required!
+## Step 1: API Key Required!
 This project uses the publicly available BBC News RSS feed (`http://feeds.bbci.co.uk/news/rss.xml`), so you do not need to register for any News APIs.
 
 ---
