@@ -1,6 +1,7 @@
 ﻿import os
 import json
 from datetime import date
+import requests
 import streamlit as st
 import pandas as pd
 import gspread
@@ -73,6 +74,67 @@ if not GOOGLE_CREDENTIALS_JSON:
     try: GOOGLE_CREDENTIALS_JSON = st.secrets.get("GOOGLE_CREDENTIALS_JSON")
     except: GOOGLE_CREDENTIALS_JSON = None
 
+# Guardian API key — use 'test' (free, rate-limited) or your own key from
+# https://open-platform.theguardian.com/access/
+GUARDIAN_API_KEY = os.getenv("GUARDIAN_API_KEY", "test")
+try:
+    secret_key = st.secrets.get("GUARDIAN_API_KEY")
+    if secret_key:
+        GUARDIAN_API_KEY = secret_key
+except Exception:
+    pass
+
+# Guardian section map for each category
+GUARDIAN_SECTION_MAP = {
+    "World/Current Affairs": "world",
+    "Sports":                "sport",
+    "Entertainment/Movies":  "culture",
+    "Technology":            "technology",
+    "Business":              "business",
+}
+
+@st.cache_data(ttl=1800)
+def fetch_guardian_news(query_date: date, category: str = "All"):
+    """Fetch top news from The Guardian API for a specific date."""
+    date_str = query_date.strftime("%Y-%m-%d")
+    base_url = "https://content.guardianapis.com/search"
+    results = []
+
+    sections = list(GUARDIAN_SECTION_MAP.values()) if category == "All" else [
+        GUARDIAN_SECTION_MAP.get(category, "news")
+    ]
+    section_labels = (
+        {v: k for k, v in GUARDIAN_SECTION_MAP.items()}
+    )
+
+    for section in sections:
+        params = {
+            "from-date": date_str,
+            "to-date": date_str,
+            "section": section,
+            "page-size": 4 if category == "All" else 10,
+            "show-fields": "trailText,shortUrl",
+            "api-key": GUARDIAN_API_KEY,
+            "order-by": "relevance",
+        }
+        try:
+            resp = requests.get(base_url, params=params, timeout=10)
+            resp.raise_for_status()
+            data = resp.json()
+            for item in data.get("response", {}).get("results", []):
+                cat_label = section_labels.get(section, section.title())
+                results.append({
+                    "Title":       item.get("webTitle", "No Title"),
+                    "URL":         item.get("webUrl", ""),
+                    "Source":      f"The Guardian ({cat_label})",
+                    "Description": item.get("fields", {}).get("trailText", ""),
+                    "Date":        pd.Timestamp(date_str),
+                })
+        except Exception:
+            pass
+
+    return pd.DataFrame(results) if results else pd.DataFrame()
+
 @st.cache_data(ttl=3600)
 def load_data():
     if not GOOGLE_SHEET_URL or not GOOGLE_CREDENTIALS_JSON:
@@ -108,7 +170,7 @@ else:
     col_cal, col_clear = st.columns([3, 1])
     with col_cal:
         available_dates = sorted(df["Date"].dt.date.unique(), reverse=True)
-        min_date = date(2020, 1, 1)
+        min_date = date(1999, 1, 1)
         max_date = date.today()
         default_date = available_dates[0] if available_dates else max_date
         default_date = max(min_date, min(default_date, max_date))
@@ -132,14 +194,19 @@ else:
     if selected_date is not None:
         date_filtered = filtered_df[filtered_df["Date"].dt.date == selected_date]
 
+    using_guardian = False
     if selected_date is not None and date_filtered.empty:
-        all_dates = filtered_df["Date"].dt.date.unique() # Now uses filtered_df
-        if len(all_dates) > 0:
-            closest = min(all_dates, key=lambda d: abs((d - selected_date).days))
-            date_filtered = filtered_df[filtered_df["Date"].dt.date == closest]
-            diff = abs((closest - selected_date).days)
-            st.info(f"No news was stored for {selected_date.strftime('%d %B %Y')} in this category. Showing the nearest available news from {closest.strftime('%d %B %Y')} ({diff} day(s) away).")
-            selected_date = closest
+        # Fallback: fetch live from The Guardian API for the selected date
+        guardian_df = fetch_guardian_news(selected_date, active_cat)
+        if not guardian_df.empty:
+            date_filtered = guardian_df
+            using_guardian = True
+            st.info(
+                f"📰 No locally stored news for {selected_date.strftime('%d %B %Y')}. "
+                f"Showing live results from **The Guardian** archive."
+            )
+        else:
+            st.warning(f"No news found for {selected_date.strftime('%d %B %Y')} in any source.")
 
     filtered_df = date_filtered
     date_label = selected_date.strftime("%d %B %Y") if selected_date else "All Dates"
