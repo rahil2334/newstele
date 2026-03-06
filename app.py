@@ -87,7 +87,7 @@ def load_data():
         if not records:
             return pd.DataFrame()
         df = pd.DataFrame(records)
-        df["Date"] = pd.to_datetime(df["Date"])
+        df["Date"] = pd.to_datetime(df["Date"], format="mixed", dayfirst=True)
         return df.sort_values(by="Date", ascending=False)
     except Exception as e:
         st.error(f"Error loading news data: {e}")
@@ -126,12 +126,12 @@ else:
         date_filtered = filtered_df[filtered_df["Date"].dt.date == selected_date]
 
     if selected_date is not None and date_filtered.empty:
-        all_dates = df["Date"].dt.date.unique()
+        all_dates = filtered_df["Date"].dt.date.unique() # Now uses filtered_df
         if len(all_dates) > 0:
             closest = min(all_dates, key=lambda d: abs((d - selected_date).days))
             date_filtered = filtered_df[filtered_df["Date"].dt.date == closest]
             diff = abs((closest - selected_date).days)
-            st.info(f"No news was stored for {selected_date.strftime('%d %B %Y')}. News is saved only on days the automation runs. Showing the nearest available news from {closest.strftime('%d %B %Y')} ({diff} day(s) away).")
+            st.info(f"No news was stored for {selected_date.strftime('%d %B %Y')} in this category. Showing the nearest available news from {closest.strftime('%d %B %Y')} ({diff} day(s) away).")
             selected_date = closest
 
     filtered_df = date_filtered
