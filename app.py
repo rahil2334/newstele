@@ -87,7 +87,10 @@ def load_data():
         if not records:
             return pd.DataFrame()
         df = pd.DataFrame(records)
-        df["Date"] = pd.to_datetime(df["Date"], format="mixed", dayfirst=True)
+        try:
+            df["Date"] = pd.to_datetime(df["Date"], format="%Y-%m-%d %H:%M:%S UTC")
+        except Exception:
+            df["Date"] = pd.to_datetime(df["Date"], format="mixed")
         return df.sort_values(by="Date", ascending=False)
     except Exception as e:
         st.error(f"Error loading news data: {e}")
@@ -105,11 +108,15 @@ else:
     col_cal, col_clear = st.columns([3, 1])
     with col_cal:
         available_dates = sorted(df["Date"].dt.date.unique(), reverse=True)
+        min_date = date(2020, 1, 1)
+        max_date = date.today()
+        default_date = available_dates[0] if available_dates else max_date
+        default_date = max(min_date, min(default_date, max_date))
         selected_date = st.date_input(
             "Select a date to view news",
-            value=available_dates[0] if available_dates else date.today(),
-            min_value=date(2020, 1, 1),
-            max_value=date.today(),
+            value=default_date,
+            min_value=min_date,
+            max_value=max_date,
             help="Click any date to see news from that day"
         )
     with col_clear:
