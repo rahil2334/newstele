@@ -1,17 +1,19 @@
 # News Automation Assignment
 
-An automated data pipeline and UI dashboard that fetches the top 5 news articles daily, stores them in Google Sheets, sends a summary to a Telegram channel, and visualizes the history in a Streamlit application.
+An automated data pipeline and UI dashboard that fetches the top 5 news articles daily, stores them in Google Sheets, sends a summary to a Telegram channel, and visualizes the history in a modern Streamlit application with user authentication.
 
 ## Prerequisites
 - **Python 3.10+**
 - **A Google Account** (to use Google Sheets and Google Cloud Console)
 - **A Telegram Account** (to create a bot and a channel)
 - **A GitHub Account** (for automation)
+- **A Guardian API Key** (optional, for live fetching fallback)
 
 ---
 
-## Step 1: API Key Required!
-This project uses the publicly available BBC News RSS feed (`http://feeds.bbci.co.uk/news/rss.xml`), so you do not need to register for any News APIs.
+## Step 1: APIs Required
+- **BBC News RSS**: The project uses the publicly available BBC News RSS feed (`http://feeds.bbci.co.uk/news/rss.xml`), no registration needed here.
+- **The Guardian API**: Used as a real-time fallback if no Google sheets data is present for a given day in the UI dashboard. You can use the default `"test"` key for limited usage or get a free API key from [The Guardian Open Platform](https://open-platform.theguardian.com/access/).
 
 ---
 
@@ -62,6 +64,13 @@ To allow the script to write to your Sheet automatically:
    TELEGRAM_CHAT_ID=-100xxxxxxxxxx
    GOOGLE_SHEET_URL=https://docs.google.com/spreadsheets/d/your-id/edit
    GOOGLE_CREDENTIALS_JSON={"type":"service_account",...}
+   
+   # UI Login Defaults
+   LOGIN_USERNAME=admin
+   LOGIN_PASSWORD=password
+   
+   # Guardian API (Optional)
+   GUARDIAN_API_KEY=test
    ```
 4. Run the fetch script manually:
    ```bash
@@ -73,6 +82,12 @@ To allow the script to write to your Sheet automatically:
    streamlit run app.py
    ```
    *(To use `.env` with streamlit, you might need to copy `.env` to `.streamlit/secrets.toml` with the appropriate TOML format or just pass them as env variables).*
+
+### Initial App Login
+The first time you run `app.py`, you will be greeted by a Login/Signup page. 
+- Use the `LOGIN_USERNAME` and `LOGIN_PASSWORD` from your `.env` to log in, OR 
+- Create a new account via the Signup tab. 
+- All created credentials are saved locally in a `users.json` file.
 
 ---
 
@@ -101,5 +116,8 @@ To host the UI permanently:
    TELEGRAM_CHAT_ID = "..."
    GOOGLE_SHEET_URL = "..."
    GOOGLE_CREDENTIALS_JSON = '{"type":"service_account",...}'
+   LOGIN_USERNAME = "..."
+   LOGIN_PASSWORD = "..."
+   GUARDIAN_API_KEY = "..."
    ```
 5. Click **Deploy**.
