@@ -65,6 +65,81 @@ section[data-testid="stSidebar"]{{display:none!important;}}
 </div>
 """, unsafe_allow_html=True)
 
+# ---------------------------------------------------------
+# Login/Signup Logic
+# ---------------------------------------------------------
+
+LOGIN_USERNAME = os.getenv("LOGIN_USERNAME", "admin")
+LOGIN_PASSWORD = os.getenv("LOGIN_PASSWORD", "password")
+USERS_FILE = "users.json"
+
+def load_users() -> dict:
+    if os.path.exists(USERS_FILE):
+        try:
+            with open(USERS_FILE, "r") as f:
+                return json.load(f)
+        except (json.JSONDecodeError, ValueError):
+            pass
+    return {str(LOGIN_USERNAME): str(LOGIN_PASSWORD)}
+
+def save_user(username: str, passw: str) -> bool:
+    users = load_users()
+    if username in users:
+        return False
+    users[username] = passw
+    with open(USERS_FILE, "w") as f:
+        json.dump(users, f, indent=4)
+    return True
+
+if "logged_in" not in st.session_state:
+    st.session_state.logged_in = False
+
+if not st.session_state.logged_in:
+    _, col, _ = st.columns([1, 2, 1])
+    with col:
+        st.markdown("<h2 style='text-align: center; color: #BB1919;'>Login to Top News</h2>", unsafe_allow_html=True)
+        tab1, tab2 = st.tabs(["Login", "Sign Up"])
+        
+        with tab1:
+            with st.form("login_form"):
+                username = st.text_input("Username")
+                password = st.text_input("Password", type="password")
+                submitted = st.form_submit_button("Log In", use_container_width=True)
+                
+            if submitted:
+                users = load_users()
+                if username in users and str(users[username]) == str(password):
+                    st.session_state.logged_in = True
+                    st.rerun()
+                else:
+                    st.error("Invalid username or password.")
+                    
+        with tab2:
+            with st.form("signup_form"):
+                new_user = st.text_input("New Username")
+                new_pass = st.text_input("New Password", type="password")
+                confirm_pass = st.text_input("Confirm Password", type="password")
+                signup_submitted = st.form_submit_button("Sign Up", use_container_width=True)
+                
+            if signup_submitted:
+                if not new_user or not new_pass:
+                    st.error("Username and password are required.")
+                elif new_pass != confirm_pass:
+                    st.error("Passwords do not match.")
+                elif len(new_pass) < 4:
+                    st.error("Password must be at least 4 characters.")
+                else:
+                    if save_user(new_user, new_pass):
+                        st.success("Signup successful! You can now log in.")
+                    else:
+                        st.error("Username already exists.")
+                        
+    st.stop()  # Stop execution until logged in
+
+# ---------------------------------------------------------
+# Main Application Content (Only visible if logged in)
+# ---------------------------------------------------------
+
 GOOGLE_SHEET_URL = os.getenv("GOOGLE_SHEET_URL")
 GOOGLE_CREDENTIALS_JSON = os.getenv("GOOGLE_CREDENTIALS_JSON")
 if not GOOGLE_SHEET_URL:
@@ -205,9 +280,13 @@ else:
             st.warning(f"No news found for {selected_date.strftime('%d %B %Y')} in any source.")
 
     filtered_df = date_filtered
+    
+    # LIMIT TO 5 NEWS ITEMS
+    filtered_df = filtered_df.head(5)
+    
     date_label = selected_date.strftime("%d %B %Y") if selected_date else "All Dates"
     display_cat = active_cat if active_cat != "All" else "All Categories"
-    st.markdown(f"<p style='font-family:Inter,sans-serif;color:#888;font-size:13px;padding:0 0 14px 0;'>Showing <strong>{len(filtered_df)}</strong> articles &bull; <strong>{display_cat}</strong> &bull; {date_label}</p>", unsafe_allow_html=True)
+    st.markdown(f"<p style='font-family:Inter,sans-serif;color:#888;font-size:13px;padding:0 0 14px 0;'>Showing <strong>{len(filtered_df)}</strong> articles (Top 5 Max) &bull; <strong>{display_cat}</strong> &bull; {date_label}</p>", unsafe_allow_html=True)
 
     for _, row in filtered_df.iterrows():
         source_label = row["Source"]
