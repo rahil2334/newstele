@@ -201,10 +201,6 @@ else:
         if not guardian_df.empty:
             date_filtered = guardian_df
             using_guardian = True
-            st.info(
-                f"📰 No locally stored news for {selected_date.strftime('%d %B %Y')}. "
-                f"Showing live results from **The Guardian** archive."
-            )
         else:
             st.warning(f"No news found for {selected_date.strftime('%d %B %Y')} in any source.")
 
