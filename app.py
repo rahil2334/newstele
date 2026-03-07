@@ -225,7 +225,15 @@ def load_data():
         return pd.DataFrame()
     try:
         scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
-        creds_dict = json.loads(GOOGLE_CREDENTIALS_JSON) if isinstance(GOOGLE_CREDENTIALS_JSON, str) else dict(GOOGLE_CREDENTIALS_JSON)
+        if isinstance(GOOGLE_CREDENTIALS_JSON, str):
+            try:
+                creds_dict = json.loads(GOOGLE_CREDENTIALS_JSON)
+            except json.JSONDecodeError:
+                import ast
+                creds_dict = ast.literal_eval(GOOGLE_CREDENTIALS_JSON)
+        else:
+            creds_dict = dict(GOOGLE_CREDENTIALS_JSON)
+            
         creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
         client = gspread.authorize(creds)
         sheet = client.open_by_url(GOOGLE_SHEET_URL).sheet1
@@ -247,7 +255,15 @@ def append_to_gsheet(news_df):
         return
     try:
         scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
-        creds_dict = json.loads(GOOGLE_CREDENTIALS_JSON) if isinstance(GOOGLE_CREDENTIALS_JSON, str) else dict(GOOGLE_CREDENTIALS_JSON)
+        if isinstance(GOOGLE_CREDENTIALS_JSON, str):
+            try:
+                creds_dict = json.loads(GOOGLE_CREDENTIALS_JSON)
+            except json.JSONDecodeError:
+                import ast
+                creds_dict = ast.literal_eval(GOOGLE_CREDENTIALS_JSON)
+        else:
+            creds_dict = dict(GOOGLE_CREDENTIALS_JSON)
+            
         creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
         client = gspread.authorize(creds)
         sheet = client.open_by_url(GOOGLE_SHEET_URL).sheet1
