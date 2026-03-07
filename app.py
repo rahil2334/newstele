@@ -276,9 +276,10 @@ def _parse_google_creds() -> dict:
     if raw is None:
         raise ValueError("GOOGLE_CREDENTIALS_JSON is not configured.")
     if isinstance(raw, str):
-        # TOML triple-quoted strings sometimes double-escape the newlines
+        # TOML triple-quoted strings sometimes double-escape the newlines,
+        # or have raw newlines. `strict=False` allows control characters.
         cleaned = raw.replace('\\n', '\n')
-        return json.loads(cleaned)
+        return json.loads(cleaned, strict=False)
     # Streamlit already parsed the TOML table into a dict-like object
     return dict(raw)
 
