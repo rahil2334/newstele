@@ -263,25 +263,35 @@ def _get_secret(key: str, default=None):
         return default
 
 GOOGLE_SHEET_URL        = _get_secret("GOOGLE_SHEET_URL")
-GOOGLE_CREDENTIALS_JSON = _get_secret("GOOGLE_CREDENTIALS_JSON")
 TELEGRAM_BOT_TOKEN      = _get_secret("TELEGRAM_BOT_TOKEN")
 TELEGRAM_CHAT_ID        = _get_secret("TELEGRAM_CHAT_ID")
 GUARDIAN_API_KEY        = _get_secret("GUARDIAN_API_KEY", "test")
 
 # ---------------------------------------------------------
-# Helper: parse Google credentials (handles str & dict/AttrDict)
+# Helper: get Google credentials (handles env string & Streamlit Dict)
 # ---------------------------------------------------------
 def _parse_google_creds() -> dict:
-    raw = GOOGLE_CREDENTIALS_JSON
-    if raw is None:
-        raise ValueError("GOOGLE_CREDENTIALS_JSON is not configured.")
-    if isinstance(raw, str):
-        # TOML triple-quoted strings sometimes double-escape the newlines,
-        # or have raw newlines. `strict=False` allows control characters.
-        cleaned = raw.replace('\\n', '\n')
-        return json.loads(cleaned, strict=False)
-    # Streamlit already parsed the TOML table into a dict-like object
-    return dict(raw)
+    # 1. Check local environment variable (JSON string)
+    env_creds = os.getenv("GOOGLE_CREDENTIALS_JSON")
+    if env_creds:
+        return json.loads(env_creds, strict=False)
+        
+    # 2. Check Streamlit secrets (already parsed TOML dictionary)
+    try:
+        if "google_credentials" in st.secrets:
+            return dict(st.secrets["google_credentials"])
+        elif "GOOGLE_CREDENTIALS_JSON" in st.secrets:
+            raw = st.secrets["GOOGLE_CREDENTIALS_JSON"]
+            if isinstance(raw, str):
+                return json.loads(raw, strict=False)
+            return dict(raw)
+    except Exception as e:
+        raise ValueError(f"Failed extracting credentials from Streamlit Secrets: {e}")
+        
+    raise ValueError("Google Credentials not found in .env or Streamlit Secrets")
+GUARDIAN_API_KEY        = _get_secret("GUARDIAN_API_KEY", "test")
+
+
 
 # ---------------------------------------------------------
 # Guardian section map
@@ -340,11 +350,12 @@ def fetch_guardian_news(query_date: date, category: str = "All"):
 # Append fetched articles to Google Sheet
 # ---------------------------------------------------------
 def append_to_gsheet(news_df: pd.DataFrame):
-    if not GOOGLE_SHEET_URL or not GOOGLE_CREDENTIALS_JSON or news_df.empty:
+    if not GOOGLE_SHEET_URL or news_df.empty:
         return
     try:
+        creds_dict = _parse_google_creds()
         scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
-        creds = ServiceAccountCredentials.from_json_keyfile_dict(_parse_google_creds(), scope)
+        creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
         client = gspread.authorize(creds)
         sheet = client.open_by_url(GOOGLE_SHEET_URL).sheet1
 
@@ -397,11 +408,12 @@ def send_to_telegram(news_df: pd.DataFrame, date_obj):
 # ---------------------------------------------------------
 @st.cache_data(ttl=3600)
 def load_data():
-    if not GOOGLE_SHEET_URL or not GOOGLE_CREDENTIALS_JSON:
+    if not GOOGLE_SHEET_URL:
         return pd.DataFrame()
     try:
+        creds_dict = _parse_google_creds()
         scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
-        creds = ServiceAccountCredentials.from_json_keyfile_dict(_parse_google_creds(), scope)
+        creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
         client = gspread.authorize(creds)
         sheet = client.open_by_url(GOOGLE_SHEET_URL).sheet1
         records = sheet.get_all_records()
@@ -424,7 +436,13 @@ df = load_data()
 # ---------------------------------------------------------
 st.markdown('<div class="content-wrapper">', unsafe_allow_html=True)
 
-if not GOOGLE_SHEET_URL or not GOOGLE_CREDENTIALS_JSON:
+try:
+    _parse_google_creds()
+    creds_ok = True
+except Exception:
+    creds_ok = False
+
+if not GOOGLE_SHEET_URL or not creds_ok:
     st.error("Missing Google Sheets configuration. Please check your environment variables or Streamlit secrets.")
 elif df.empty:
     st.info("No news data available yet. Please run `fetch_news.py` to populate the Google Sheet.")
