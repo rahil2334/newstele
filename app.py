@@ -149,6 +149,15 @@ if not GOOGLE_CREDENTIALS_JSON:
     try: GOOGLE_CREDENTIALS_JSON = st.secrets.get("GOOGLE_CREDENTIALS_JSON")
     except: GOOGLE_CREDENTIALS_JSON = None
 
+TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
+TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
+if not TELEGRAM_BOT_TOKEN:
+    try: TELEGRAM_BOT_TOKEN = st.secrets.get("TELEGRAM_BOT_TOKEN")
+    except: TELEGRAM_BOT_TOKEN = None
+if not TELEGRAM_CHAT_ID:
+    try: TELEGRAM_CHAT_ID = st.secrets.get("TELEGRAM_CHAT_ID")
+    except: TELEGRAM_CHAT_ID = None
+
 # Guardian API key — use 'test' (free, rate-limited) or your own key from
 # https://open-platform.theguardian.com/access/
 GUARDIAN_API_KEY = os.getenv("GUARDIAN_API_KEY", "test")
@@ -233,6 +242,55 @@ def load_data():
         st.error(f"Error loading news data: {e}")
         return pd.DataFrame()
 
+def append_to_gsheet(news_df):
+    if not GOOGLE_SHEET_URL or not GOOGLE_CREDENTIALS_JSON or news_df.empty:
+        return
+    try:
+        scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
+        creds_dict = json.loads(GOOGLE_CREDENTIALS_JSON) if isinstance(GOOGLE_CREDENTIALS_JSON, str) else dict(GOOGLE_CREDENTIALS_JSON)
+        creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
+        client = gspread.authorize(creds)
+        sheet = client.open_by_url(GOOGLE_SHEET_URL).sheet1
+        
+        for _, row in news_df.iterrows():
+            date_str = pd.Timestamp(row["Date"]).strftime("%Y-%m-%d %H:%M:%S UTC")
+            sheet.append_row([
+                date_str,
+                str(row["Title"]),
+                str(row["Source"]),
+                str(row["Description"]),
+                str(row["URL"])
+            ])
+    except Exception as e:
+        st.error(f"Error appending to sheets: {e}")
+
+def send_to_telegram(news_df, date_obj):
+    if not TELEGRAM_BOT_TOKEN or not TELEGRAM_CHAT_ID or news_df.empty:
+        return
+    import html
+    date_str = date_obj.strftime("%d %b %Y") if date_obj else "Unknown Date"
+    message = f"📰 <b>Top News – {date_str}</b>\n\n"
+    
+    for i, row in enumerate(news_df.head(5).itertuples(), 1):
+        safe_title = html.escape(str(row.Title))
+        safe_source = html.escape(str(row.Source))
+        safe_url = html.escape(str(row.URL))
+        message += f"<b>{i}. {safe_title}</b>\n"
+        message += f"Source: {safe_source}\n"
+        message += f"Read more: <a href='{safe_url}'>Link</a>\n\n"
+
+    url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
+    payload = {
+        "chat_id": TELEGRAM_CHAT_ID,
+        "text": message,
+        "parse_mode": "HTML",
+        "disable_web_page_preview": True
+    }
+    try:
+        requests.post(url, json=payload, timeout=5)
+    except Exception as e:
+        st.error(f"Error sending to Telegram: {e}")
+
 df = load_data()
 
 st.markdown("<div class='content-wrapper'>", unsafe_allow_html=True)
@@ -276,6 +334,13 @@ else:
         if not guardian_df.empty:
             date_filtered = guardian_df
             using_guardian = True
+            
+            # Send to Telegram and Save to GSheets
+            append_to_gsheet(guardian_df)
+            send_to_telegram(guardian_df, selected_date)
+            
+            # Refresh st.cache_data for load_data() so next reload gets it from sheet
+            load_data.clear()
         else:
             st.warning(f"No news found for {selected_date.strftime('%d %B %Y')} in any source.")
 
