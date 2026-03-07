@@ -140,23 +140,34 @@ if not st.session_state.logged_in:
 # Main Application Content (Only visible if logged in)
 # ---------------------------------------------------------
 
-GOOGLE_SHEET_URL = os.getenv("GOOGLE_SHEET_URL")
-GOOGLE_CREDENTIALS_JSON = os.getenv("GOOGLE_CREDENTIALS_JSON")
-if not GOOGLE_SHEET_URL:
-    try: GOOGLE_SHEET_URL = st.secrets.get("GOOGLE_SHEET_URL")
-    except: GOOGLE_SHEET_URL = None
-if not GOOGLE_CREDENTIALS_JSON:
-    try: GOOGLE_CREDENTIALS_JSON = st.secrets.get("GOOGLE_CREDENTIALS_JSON")
-    except: GOOGLE_CREDENTIALS_JSON = None
+def _get_secret(key, default=None):
+    """Read from env first, then Streamlit secrets."""
+    val = os.getenv(key)
+    if val:
+        return val
+    try:
+        val = st.secrets.get(key)
+        return val if val is not None else default
+    except Exception:
+        return default
 
-TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
-TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
-if not TELEGRAM_BOT_TOKEN:
-    try: TELEGRAM_BOT_TOKEN = st.secrets.get("TELEGRAM_BOT_TOKEN")
-    except: TELEGRAM_BOT_TOKEN = None
-if not TELEGRAM_CHAT_ID:
-    try: TELEGRAM_CHAT_ID = st.secrets.get("TELEGRAM_CHAT_ID")
-    except: TELEGRAM_CHAT_ID = None
+GOOGLE_SHEET_URL        = _get_secret("GOOGLE_SHEET_URL")
+GOOGLE_CREDENTIALS_JSON = _get_secret("GOOGLE_CREDENTIALS_JSON")
+TELEGRAM_BOT_TOKEN      = _get_secret("TELEGRAM_BOT_TOKEN")
+TELEGRAM_CHAT_ID        = _get_secret("TELEGRAM_CHAT_ID")
+
+def _parse_google_creds():
+    """Return a credentials dict regardless of whether the secret is a
+    JSON string, a TOML-parsed dict, or a Streamlit AttrDict."""
+    raw = GOOGLE_CREDENTIALS_JSON
+    if raw is None:
+        raise ValueError("GOOGLE_CREDENTIALS_JSON is not set")
+    if isinstance(raw, str):
+        # Fix escaped newlines that TOML sometimes double-escapes
+        cleaned = raw.replace('\\n', '\n')
+        return json.loads(cleaned)
+    # Streamlit/TOML already parsed it into a dict-like object
+    return dict(raw)
 
 # Guardian API key — use 'test' (free, rate-limited) or your own key from
 # https://open-platform.theguardian.com/access/
@@ -225,15 +236,7 @@ def load_data():
         return pd.DataFrame()
     try:
         scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
-        if isinstance(GOOGLE_CREDENTIALS_JSON, str):
-            try:
-                creds_dict = json.loads(GOOGLE_CREDENTIALS_JSON)
-            except json.JSONDecodeError:
-                import ast
-                creds_dict = ast.literal_eval(GOOGLE_CREDENTIALS_JSON)
-        else:
-            creds_dict = dict(GOOGLE_CREDENTIALS_JSON)
-            
+        creds_dict = _parse_google_creds()
         creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
         client = gspread.authorize(creds)
         sheet = client.open_by_url(GOOGLE_SHEET_URL).sheet1
@@ -255,15 +258,7 @@ def append_to_gsheet(news_df):
         return
     try:
         scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
-        if isinstance(GOOGLE_CREDENTIALS_JSON, str):
-            try:
-                creds_dict = json.loads(GOOGLE_CREDENTIALS_JSON)
-            except json.JSONDecodeError:
-                import ast
-                creds_dict = ast.literal_eval(GOOGLE_CREDENTIALS_JSON)
-        else:
-            creds_dict = dict(GOOGLE_CREDENTIALS_JSON)
-            
+        creds_dict = _parse_google_creds()
         creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
         client = gspread.authorize(creds)
         sheet = client.open_by_url(GOOGLE_SHEET_URL).sheet1
