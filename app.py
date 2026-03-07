@@ -1,7 +1,6 @@
-﻿import os
+import os
 import json
 from datetime import date
-import requests
 import streamlit as st
 import pandas as pd
 import gspread
@@ -10,13 +9,20 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-st.set_page_config(page_title="Top News Fetcher", page_icon="Newspaper", layout="wide")
+# ---------------------------------------------------------
+# Streamlit Configuration
+# ---------------------------------------------------------
+st.set_page_config(page_title="Top News Fetcher", page_icon="📰", layout="wide")
 
-try:
-    active_cat = st.query_params.get("category", "All")
-except Exception:
-    active_cat = "All"
+# ---------------------------------------------------------
+# Read active category from URL query params
+# ---------------------------------------------------------
+params = st.query_params
+active_cat = params.get("category", "All")
 
+# ---------------------------------------------------------
+# CSS + Sticky Header HTML
+# ---------------------------------------------------------
 categories = {
     "All":           "All",
     "World":         "World/Current Affairs",
@@ -33,210 +39,220 @@ for label, value in categories.items():
 
 st.markdown(f"""
 <style>
-@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap");
-*,*::before,*::after{{box-sizing:border-box;margin:0;padding:0;}}
-.block-container{{padding-top:186px!important;padding-left:0!important;padding-right:0!important;max-width:100%!important;}}
-.stApp{{background-color:#F0F0F0;font-family:"Inter",sans-serif;}}
-.sticky-header{{position:fixed;top:0;left:0;width:100%;z-index:99999;box-shadow:0 2px 8px rgba(0,0,0,0.25);}}
-.site-header{{background-color:#BB1919;color:#FFFFFF;padding:20px 48px 16px 48px;text-align:center;border-bottom:4px solid #880000;min-height:90px;display:flex;flex-direction:column;align-items:center;justify-content:center;overflow:visible;}}
-.site-header .logo{{font-family:"Times New Roman",Times,serif;font-size:48px;font-weight:bold;letter-spacing:2px;line-height:1.2;white-space:nowrap;}}
-.site-header .tagline{{font-size:11px;color:rgba(255,255,255,0.85);letter-spacing:3px;text-transform:uppercase;margin-top:4px;}}
-.nav-bar{{background-color:#1A1A1A;display:flex;align-items:center;justify-content:center;height:44px;border-bottom:2px solid #333;}}
-.nav-item{{color:#CCCCCC;font-family:"Inter",sans-serif;font-size:12px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;text-decoration:none;padding:12px 22px;height:100%;display:flex;align-items:center;border-bottom:3px solid transparent;transition:background 0.15s,color 0.15s;}}
-.nav-item:hover{{background-color:#2A2A2A;color:#FFFFFF;border-bottom:3px solid #BB1919;}}
-.nav-item.active{{color:#FFFFFF;background-color:#BB1919;border-bottom:3px solid #FF4444;}}
-.content-wrapper{{max-width:960px;margin:24px auto 0 auto;padding:0 24px 64px 24px;}}
-.news-card{{background-color:#FFFFFF;border-top:3px solid #BB1919;padding:24px 28px;margin-bottom:18px;box-shadow:0 1px 4px rgba(0,0,0,0.08);}}
-.news-card-category{{font-size:11px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:#BB1919;margin-bottom:8px;}}
-.news-card-title a{{font-family:"Times New Roman",Times,serif;font-size:24px;font-weight:bold;color:#1A1A1A;text-decoration:none;line-height:1.3;display:block;margin-bottom:10px;}}
-.news-card-title a:hover{{color:#BB1919;}}
-.news-card-meta{{font-size:12px;color:#888888;font-weight:600;letter-spacing:0.5px;text-transform:uppercase;margin-bottom:12px;border-bottom:1px solid #EEEEEE;padding-bottom:12px;}}
-.news-card-desc{{font-size:15px;color:#4A4A4A;line-height:1.65;}}
-.site-footer{{background-color:#1A1A1A;color:#AAAAAA;text-align:center;padding:20px;font-size:12px;margin-top:48px;letter-spacing:1px;}}
-header[data-testid="stHeader"]{{background:transparent;height:0;}}
-section[data-testid="stSidebar"]{{display:none!important;}}
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700&family=Inter:wght@400;600&display=swap');
+
+* {{ box-sizing: border-box; margin: 0; padding: 0; }}
+
+/* Push content below the fixed header (header ~130px + nav ~44px) */
+.block-container {{
+    padding-top: 182px !important;
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+    max-width: 100% !important;
+}}
+
+.stApp {{
+    background-color: #F0F0F0;
+    font-family: 'Inter', sans-serif;
+}}
+
+/* === STICKY WRAPPER === */
+.sticky-header {{
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    z-index: 99999;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.25);
+}}
+
+/* === RED TITLE BAR === */
+.site-header {{
+    background-color: #BB1919;
+    color: #FFFFFF;
+    padding: 20px 48px 16px 48px;
+    text-align: center;
+    border-bottom: 4px solid #880000;
+    min-height: 90px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    overflow: visible;
+}}
+
+.site-header .logo {{
+    font-family: "Times New Roman", Times, serif;
+    font-size: 48px;
+    font-weight: bold;
+    letter-spacing: 2px;
+    line-height: 1.2;
+    white-space: nowrap;
+    overflow: visible;
+}}
+
+.site-header .tagline {{
+    font-size: 11px;
+    color: rgba(255,255,255,0.85);
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    margin-top: 4px;
+}}
+
+/* === DARK NAV BAR === */
+.nav-bar {{
+    background-color: #1A1A1A;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0;
+    height: 44px;
+    border-bottom: 2px solid #333;
+}}
+
+.nav-item {{
+    color: #CCCCCC;
+    font-family: 'Inter', sans-serif;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    text-decoration: none;
+    padding: 12px 22px;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    transition: background 0.2s, color 0.2s;
+    border-bottom: 3px solid transparent;
+}}
+
+.nav-item:hover {{
+    background-color: #2A2A2A;
+    color: #FFFFFF;
+    border-bottom: 3px solid #BB1919;
+}}
+
+.nav-item.active {{
+    color: #FFFFFF;
+    background-color: #BB1919;
+    border-bottom: 3px solid #FF4444;
+}}
+
+/* === CONTENT === */
+.content-wrapper {{
+    max-width: 960px;
+    margin: 24px auto 0 auto;
+    padding: 0 24px 64px 24px;
+}}
+
+/* === NEWS CARDS === */
+.news-card {{
+    background-color: #FFFFFF;
+    border-top: 3px solid #BB1919;
+    padding: 24px 28px;
+    margin-bottom: 18px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+}}
+
+.news-card-category {{
+    font-family: 'Inter', sans-serif;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: #BB1919;
+    margin-bottom: 8px;
+}}
+
+.news-card-title a {{
+    font-family: "Times New Roman", Times, serif;
+    font-size: 24px;
+    font-weight: bold;
+    color: #1A1A1A;
+    text-decoration: none;
+    line-height: 1.3;
+    display: block;
+    margin-bottom: 10px;
+}}
+
+.news-card-title a:hover {{ color: #BB1919; }}
+
+.news-card-meta {{
+    font-family: 'Inter', sans-serif;
+    font-size: 12px;
+    color: #888888;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    margin-bottom: 12px;
+    border-bottom: 1px solid #EEEEEE;
+    padding-bottom: 12px;
+}}
+
+.news-card-desc {{
+    font-family: 'Inter', sans-serif;
+    font-size: 15px;
+    color: #4A4A4A;
+    line-height: 1.65;
+}}
+
+/* === FOOTER === */
+.site-footer {{
+    background-color: #1A1A1A;
+    color: #AAAAAA;
+    text-align: center;
+    padding: 20px;
+    font-size: 12px;
+    margin-top: 48px;
+    letter-spacing: 1px;
+}}
+
+/* Hide Streamlit top header bar chrome */
+header[data-testid="stHeader"] {{
+    background: transparent;
+    height: 0;
+}}
 </style>
+
 <div class="sticky-header">
     <div class="site-header">
         <span class="logo">Top News Fetcher</span>
         <span class="tagline">Daily News &bull; Automatically Curated</span>
     </div>
-    <div class="nav-bar">{nav_items_html}</div>
+    <div class="nav-bar">
+        {nav_items_html}
+    </div>
 </div>
 """, unsafe_allow_html=True)
 
 # ---------------------------------------------------------
-# Login/Signup Logic
+# Retrieve Secrets
 # ---------------------------------------------------------
+GOOGLE_SHEET_URL = os.getenv("GOOGLE_SHEET_URL")
+GOOGLE_CREDENTIALS_JSON = os.getenv("GOOGLE_CREDENTIALS_JSON")
 
-LOGIN_USERNAME = os.getenv("LOGIN_USERNAME", "admin")
-LOGIN_PASSWORD = os.getenv("LOGIN_PASSWORD", "password")
-USERS_FILE = "users.json"
-
-def load_users() -> dict:
-    if os.path.exists(USERS_FILE):
-        try:
-            with open(USERS_FILE, "r") as f:
-                return json.load(f)
-        except (json.JSONDecodeError, ValueError):
-            pass
-    return {str(LOGIN_USERNAME): str(LOGIN_PASSWORD)}
-
-def save_user(username: str, passw: str) -> bool:
-    users = load_users()
-    if username in users:
-        return False
-    users[username] = passw
-    with open(USERS_FILE, "w") as f:
-        json.dump(users, f, indent=4)
-    return True
-
-if "logged_in" not in st.session_state:
-    st.session_state.logged_in = False
-
-if not st.session_state.logged_in:
-    _, col, _ = st.columns([1, 2, 1])
-    with col:
-        st.markdown("<h2 style='text-align: center; color: #BB1919;'>Login to Top News</h2>", unsafe_allow_html=True)
-        tab1, tab2 = st.tabs(["Login", "Sign Up"])
-        
-        with tab1:
-            with st.form("login_form"):
-                username = st.text_input("Username")
-                password = st.text_input("Password", type="password")
-                submitted = st.form_submit_button("Log In", use_container_width=True)
-                
-            if submitted:
-                users = load_users()
-                if username in users and str(users[username]) == str(password):
-                    st.session_state.logged_in = True
-                    st.rerun()
-                else:
-                    st.error("Invalid username or password.")
-                    
-        with tab2:
-            with st.form("signup_form"):
-                new_user = st.text_input("New Username")
-                new_pass = st.text_input("New Password", type="password")
-                confirm_pass = st.text_input("Confirm Password", type="password")
-                signup_submitted = st.form_submit_button("Sign Up", use_container_width=True)
-                
-            if signup_submitted:
-                if not new_user or not new_pass:
-                    st.error("Username and password are required.")
-                elif new_pass != confirm_pass:
-                    st.error("Passwords do not match.")
-                elif len(new_pass) < 4:
-                    st.error("Password must be at least 4 characters.")
-                else:
-                    if save_user(new_user, new_pass):
-                        st.success("Signup successful! You can now log in.")
-                    else:
-                        st.error("Username already exists.")
-                        
-    st.stop()  # Stop execution until logged in
-
-# ---------------------------------------------------------
-# Main Application Content (Only visible if logged in)
-# ---------------------------------------------------------
-
-def _get_secret(key, default=None):
-    """Read from env first, then Streamlit secrets."""
-    val = os.getenv(key)
-    if val:
-        return val
+if not GOOGLE_SHEET_URL:
     try:
-        val = st.secrets.get(key)
-        return val if val is not None else default
+        GOOGLE_SHEET_URL = st.secrets.get("GOOGLE_SHEET_URL")
     except Exception:
-        return default
+        GOOGLE_SHEET_URL = None
 
-GOOGLE_SHEET_URL        = _get_secret("GOOGLE_SHEET_URL")
-GOOGLE_CREDENTIALS_JSON = _get_secret("GOOGLE_CREDENTIALS_JSON")
-TELEGRAM_BOT_TOKEN      = _get_secret("TELEGRAM_BOT_TOKEN")
-TELEGRAM_CHAT_ID        = _get_secret("TELEGRAM_CHAT_ID")
+if not GOOGLE_CREDENTIALS_JSON:
+    try:
+        GOOGLE_CREDENTIALS_JSON = st.secrets.get("GOOGLE_CREDENTIALS_JSON")
+    except Exception:
+        GOOGLE_CREDENTIALS_JSON = None
 
-def _parse_google_creds():
-    """Return a credentials dict regardless of whether the secret is a
-    JSON string, a TOML-parsed dict, or a Streamlit AttrDict."""
-    raw = GOOGLE_CREDENTIALS_JSON
-    if raw is None:
-        raise ValueError("GOOGLE_CREDENTIALS_JSON is not set")
-    if isinstance(raw, str):
-        # Fix escaped newlines that TOML sometimes double-escapes
-        cleaned = raw.replace('\\n', '\n')
-        return json.loads(cleaned)
-    # Streamlit/TOML already parsed it into a dict-like object
-    return dict(raw)
-
-# Guardian API key — use 'test' (free, rate-limited) or your own key from
-# https://open-platform.theguardian.com/access/
-GUARDIAN_API_KEY = os.getenv("GUARDIAN_API_KEY", "test")
-try:
-    secret_key = st.secrets.get("GUARDIAN_API_KEY")
-    if secret_key:
-        GUARDIAN_API_KEY = secret_key
-except Exception:
-    pass
-
-# Guardian section map for each category
-GUARDIAN_SECTION_MAP = {
-    "World/Current Affairs": "world",
-    "Sports":                "sport",
-    "Entertainment/Movies":  "culture",
-    "Technology":            "technology",
-    "Business":              "business",
-}
-
-@st.cache_data(ttl=1800)
-def fetch_guardian_news(query_date: date, category: str = "All"):
-    """Fetch top news from The Guardian API for a specific date."""
-    date_str = query_date.strftime("%Y-%m-%d")
-    base_url = "https://content.guardianapis.com/search"
-    results = []
-
-    sections = list(GUARDIAN_SECTION_MAP.values()) if category == "All" else [
-        GUARDIAN_SECTION_MAP.get(category, "news")
-    ]
-    section_labels = (
-        {v: k for k, v in GUARDIAN_SECTION_MAP.items()}
-    )
-
-    for section in sections:
-        params = {
-            "from-date": date_str,
-            "to-date": date_str,
-            "section": section,
-            "page-size": 4 if category == "All" else 10,
-            "show-fields": "trailText,shortUrl",
-            "api-key": GUARDIAN_API_KEY,
-            "order-by": "relevance",
-        }
-        try:
-            resp = requests.get(base_url, params=params, timeout=10)
-            resp.raise_for_status()
-            data = resp.json()
-            for item in data.get("response", {}).get("results", []):
-                cat_label = section_labels.get(section, section.title())
-                results.append({
-                    "Title":       item.get("webTitle", "No Title"),
-                    "URL":         item.get("webUrl", ""),
-                    "Source":      f"The Guardian ({cat_label})",
-                    "Description": item.get("fields", {}).get("trailText", ""),
-                    "Date":        pd.Timestamp(date_str),
-                })
-        except Exception:
-            pass
-
-    return pd.DataFrame(results) if results else pd.DataFrame()
-
+# ---------------------------------------------------------
+# Load Data
+# ---------------------------------------------------------
 @st.cache_data(ttl=3600)
 def load_data():
     if not GOOGLE_SHEET_URL or not GOOGLE_CREDENTIALS_JSON:
         return pd.DataFrame()
     try:
-        scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
-        creds_dict = _parse_google_creds()
+        scope = ['https://spreadsheets.google.com/feeds', 'https://www.googleapis.com/auth/drive']
+        creds_dict = json.loads(GOOGLE_CREDENTIALS_JSON) if isinstance(GOOGLE_CREDENTIALS_JSON, str) else dict(GOOGLE_CREDENTIALS_JSON)
         creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
         client = gspread.authorize(creds)
         sheet = client.open_by_url(GOOGLE_SHEET_URL).sheet1
@@ -244,136 +260,96 @@ def load_data():
         if not records:
             return pd.DataFrame()
         df = pd.DataFrame(records)
-        try:
-            df["Date"] = pd.to_datetime(df["Date"], format="%Y-%m-%d %H:%M:%S UTC")
-        except Exception:
-            df["Date"] = pd.to_datetime(df["Date"], format="mixed")
+        df['Date'] = pd.to_datetime(df['Date'])
         return df.sort_values(by="Date", ascending=False)
     except Exception as e:
-        st.error(f"Error loading news data: {e}")
+        st.error(f"Error accessing Google Sheets: {e}")
         return pd.DataFrame()
-
-def append_to_gsheet(news_df):
-    if not GOOGLE_SHEET_URL or not GOOGLE_CREDENTIALS_JSON or news_df.empty:
-        return
-    try:
-        scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
-        creds_dict = _parse_google_creds()
-        creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
-        client = gspread.authorize(creds)
-        sheet = client.open_by_url(GOOGLE_SHEET_URL).sheet1
-        
-        for _, row in news_df.iterrows():
-            date_str = pd.Timestamp(row["Date"]).strftime("%Y-%m-%d %H:%M:%S UTC")
-            sheet.append_row([
-                date_str,
-                str(row["Title"]),
-                str(row["Source"]),
-                str(row["Description"]),
-                str(row["URL"])
-            ])
-    except Exception as e:
-        st.error(f"Error appending to sheets: {e}")
-
-def send_to_telegram(news_df, date_obj):
-    if not TELEGRAM_BOT_TOKEN or not TELEGRAM_CHAT_ID or news_df.empty:
-        return
-    import html
-    date_str = date_obj.strftime("%d %b %Y") if date_obj else "Unknown Date"
-    message = f"📰 <b>Top News – {date_str}</b>\n\n"
-    
-    for i, row in enumerate(news_df.head(5).itertuples(), 1):
-        safe_title = html.escape(str(row.Title))
-        safe_source = html.escape(str(row.Source))
-        safe_url = html.escape(str(row.URL))
-        message += f"<b>{i}. {safe_title}</b>\n"
-        message += f"Source: {safe_source}\n"
-        message += f"Read more: <a href='{safe_url}'>Link</a>\n\n"
-
-    url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
-    payload = {
-        "chat_id": TELEGRAM_CHAT_ID,
-        "text": message,
-        "parse_mode": "HTML",
-        "disable_web_page_preview": True
-    }
-    try:
-        requests.post(url, json=payload, timeout=5)
-    except Exception as e:
-        st.error(f"Error sending to Telegram: {e}")
 
 df = load_data()
 
-st.markdown("<div class='content-wrapper'>", unsafe_allow_html=True)
+# ---------------------------------------------------------
+# Sidebar Filters
+# ---------------------------------------------------------
+st.sidebar.markdown("## 🔍 Filter News")
+search_query = st.sidebar.text_input("🔎 Search Title or Description")
+
+# ---------------------------------------------------------
+# Main Content
+# ---------------------------------------------------------
+st.markdown('<div class="content-wrapper">', unsafe_allow_html=True)
 
 if not GOOGLE_SHEET_URL or not GOOGLE_CREDENTIALS_JSON:
-    st.error("Missing Google Sheets configuration. Please check your environment variables or Streamlit secrets.")
+    st.error("Missing Google Sheets Configuration. Please check your environment variables or Streamlit secrets.")
 elif df.empty:
-    st.info("No news data available yet. Please run fetch_news.py to populate the Google Sheet.")
+    st.info("No news data available yet. Please run `fetch_news.py` to populate the Google Sheet.")
 else:
+    # Calendar date picker
     col_cal, col_clear = st.columns([3, 1])
     with col_cal:
-        available_dates = sorted(df["Date"].dt.date.unique(), reverse=True)
-        min_date = date(1999, 1, 1)
-        max_date = date.today()
-        default_date = available_dates[0] if available_dates else max_date
-        default_date = max(min_date, min(default_date, max_date))
+        available_dates = sorted(df['Date'].dt.date.unique(), reverse=True)
         selected_date = st.date_input(
-            "Select a date to view news",
-            value=default_date,
-            min_value=min_date,
-            max_value=max_date,
-            help="Click any date to see news from that day"
+            "📅 Select a date to view news",
+            value=available_dates[0] if available_dates else date.today(),
+            min_value=date(2020, 1, 1),
+            max_value=date.today(),
+            help="Navigate the calendar and click any past date to see news from that day"
         )
     with col_clear:
         st.write("")
-        if st.button("Show All Dates"):
+        if st.button("🔄 Show All Dates"):
             selected_date = None
 
     filtered_df = df.copy()
-    if active_cat != "All":
-        filtered_df = filtered_df[filtered_df["Source"].str.contains(active_cat, case=False, na=False)]
 
+    # Apply category filter
+    if active_cat != "All":
+        filtered_df = filtered_df[filtered_df['Source'].str.contains(active_cat, case=False, na=False)]
+
+    # Apply date filter from calendar
     date_filtered = filtered_df.copy()
     if selected_date is not None:
-        date_filtered = filtered_df[filtered_df["Date"].dt.date == selected_date]
+        date_filtered = filtered_df[filtered_df['Date'].dt.date == selected_date]
 
-    using_guardian = False
+    # If no articles found for that exact date, show fallback
     if selected_date is not None and date_filtered.empty:
-        # Fallback: fetch live from The Guardian API for the selected date
-        guardian_df = fetch_guardian_news(selected_date, active_cat)
-        if not guardian_df.empty:
-            date_filtered = guardian_df
-            using_guardian = True
-            
-            # Send to Telegram and Save to GSheets
-            append_to_gsheet(guardian_df)
-            send_to_telegram(guardian_df, selected_date)
-            
-            # Refresh st.cache_data for load_data() so next reload gets it from sheet
-            load_data.clear()
-        else:
-            st.warning(f"No news found for {selected_date.strftime('%d %B %Y')} in any source.")
+        st.warning(f"No news found for **{selected_date.strftime('%d %B %Y')}**. The automation runs daily, so news is only stored for days the script has run. Showing the latest available articles instead.")
+        # Keep filtered_df as is (all dates, category still applied)
+    else:
+        filtered_df = date_filtered
 
-    filtered_df = date_filtered
-    
-    # LIMIT TO 5 NEWS ITEMS
-    filtered_df = filtered_df.head(5)
-    
-    date_label = selected_date.strftime("%d %B %Y") if selected_date else "All Dates"
+    if search_query:
+        filtered_df = filtered_df[
+            filtered_df['Title'].str.contains(search_query, case=False, na=False) |
+            filtered_df['Description'].str.contains(search_query, case=False, na=False)
+        ]
+
+    date_label = selected_date.strftime('%d %B %Y') if selected_date else "All Dates"
     display_cat = active_cat if active_cat != "All" else "All Categories"
-    st.markdown(f"<p style='font-family:Inter,sans-serif;color:#888;font-size:13px;padding:0 0 14px 0;'>Showing <strong>{len(filtered_df)}</strong> articles (Top 5 Max) &bull; <strong>{display_cat}</strong> &bull; {date_label}</p>", unsafe_allow_html=True)
+    st.markdown(
+        f"<p style='font-family:Inter,sans-serif;color:#888;font-size:13px;padding:0 0 14px 0;'>"
+        f"Showing <strong>{len(filtered_df)}</strong> articles &bull; <strong>{display_cat}</strong> &bull; {date_label}</p>",
+        unsafe_allow_html=True
+    )
 
     for _, row in filtered_df.iterrows():
-        source_label = row["Source"]
+        source_label = row['Source']
         category_tag = source_label.split("(")[-1].rstrip(")") if "(" in source_label else source_label
+
         st.markdown(f"""
         <div class="news-card">
             <div class="news-card-category">{category_tag}</div>
-            <div class="news-card-title"><a href="{row['URL']}" target="_blank">{row['Title']}</a></div>
+            <div class="news-card-title">
+                <a href="{row['URL']}" target="_blank">{row['Title']}</a>
+            </div>
             <div class="news-card-meta">{source_label} &nbsp;|&nbsp; {row['Date'].strftime('%d %B %Y')}</div>
             <div class="news-card-desc">{row['Description']}</div>
-        </div>""", unsafe_allow_html=True)
+        </div>
+        """, unsafe_allow_html=True)
 
 st.markdown("</div>", unsafe_allow_html=True)
-st.markdown('<div class="site-footer">&copy; 2026 Top News Fetcher &mdash; Automated BBC News Aggregator &bull; Powered by Streamlit</div>', unsafe_allow_html=True)
+st.markdown("""
+<div class="site-footer">
+    &copy; 2025 Top News Fetcher &mdash; Automated BBC News Aggregator &bull; Powered by Streamlit
+</div>
+""", unsafe_allow_html=True)
