@@ -475,17 +475,28 @@ else:
         date_filtered = filtered_df[filtered_df["Date"].dt.date == selected_date]
 
     using_guardian = False
-    if selected_date is not None and date_filtered.empty:
-        # Fallback: fetch live from The Guardian for the selected date
-        guardian_df = fetch_guardian_news(selected_date, active_cat)
-        if not guardian_df.empty:
-            date_filtered  = guardian_df
-            using_guardian = True
-            # Save to Google Sheet + notify Telegram
-            append_to_gsheet(guardian_df)
-            send_to_telegram(guardian_df, selected_date)
-            load_data.clear()   # invalidate cache so next load picks up new rows
-        else:
+    if selected_date is not None:
+        if "synced_dates" not in st.session_state:
+            st.session_state.synced_dates = set()
+
+        if selected_date not in st.session_state.synced_dates:
+            st.session_state.synced_dates.add(selected_date)
+            
+            # Fetch live from The Guardian for the selected date
+            guardian_df = fetch_guardian_news(selected_date, active_cat)
+            if not guardian_df.empty:
+                # Save to Google Sheet + notify Telegram
+                append_to_gsheet(guardian_df)
+                send_to_telegram(guardian_df, selected_date)
+                load_data.clear()   # invalidate cache so next load picks up new rows
+                
+                # If we had no news locally, show the newly fetched news directly
+                if date_filtered.empty:
+                    date_filtered = guardian_df
+                    using_guardian = True
+                    
+        # If it's still empty (we had nothing locally and Guardian returned nothing)
+        if date_filtered.empty:
             st.warning(f"No news found for **{selected_date.strftime('%d %B %Y')}** in any source.")
 
     filtered_df = date_filtered.head(5)
